@@ -23,13 +23,12 @@ jobs:
       pull-requests: write
 
     steps:
-    - uses: actions/checkout@v3    
+    - uses: actions/checkout@v3
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag $IMAGE_NAME:${GITHUB_SHA}
 
     - name: Start Container
       run: docker run --rm -tdi --name unit_test_app-${GITHUB_SHA} $IMAGE_NAME:${GITHUB_SHA}
-
     - name: Run Tests in the Image
       run: docker exec -t unit_test_app-${GITHUB_SHA} nosetests --with-xunit --with-coverage --cover-package=project test_users.py
 
@@ -41,4 +40,25 @@ jobs:
       if: always()
       with:
         files: |
-          *.xml      
+          *.xml
+
+
+    - name: Log in to registry
+      # This is where you will update the personal access token to TOKEN
+      run: echo "${{ secrets.TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+    - name: Push image
+      run: |
+        IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+
+        # Change all uppercase to lowercase
+        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+        # Strip git ref prefix from version
+        VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+        # Strip "v" prefix from tag name
+        [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+        # Use Docker `latest` tag convention
+        [ "$VERSION" == "main" ] && VERSION=latest
+        echo IMAGE_ID=$IMAGE_ID
+        echo VERSION=$VERSION
+        docker tag $IMAGE_NAME:${GITHUB_SHA} $IMAGE_ID:$VERSION
